@@ -70,7 +70,6 @@
         path: /etc/postgresql/15/main/postgresql.conf
         regexp: '^data_directory\s*='
         line: "data_directory = '{{ data_directory }}'"
-      tags: now
     - name: Start and enable postgresql-server
       systemd:
         state: restarted
