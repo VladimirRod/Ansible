@@ -1,0 +1,78 @@
+- hosts: app
+  gather_facts: yes
+  tasks:
+    - name: Install requirements
+      apt:
+        name: "{{ packages }}"
+        update_cache: true
+        state: present
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+      vars:
+        packages:
+          - ca-certificates
+          - curl
+          - gnupg
+    - name: Add GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+    - name: Add Docker repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+    - name: Install Docker
+      apt:
+        name: "{{ packages }}"
+        state: present
+      when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+      vars:
+        packages:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+    - name: Install Docker on Centos
+      yum:
+        name: docker
+        state: present
+        update_cache: yes
+      when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+    - name: Enable and start Docker
+      systemd:
+        state: started
+        enabled: yes
+        name: docker
+
+- hosts: database
+  tasks:
+    - name: Add key
+      shell: wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+      ignore_errors: yes
+    - name: Add postgres repo
+      apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt/ focal-pgdg main"
+        state: present
+        filename: pgdg
+        update_cache: yes
+    - name: Install postgresql-server
+      apt:
+        name: '{{ item }}'
+        state: present
+        update_cache: yes
+      loop:
+        - 'postgresql-{{ database_version }}'
+        - postgresql-contrib
+    - name: Replace data directory
+      lineinfile:
+        path: /etc/postgresql/15/main/postgresql.conf
+        regexp: '^data_directory\s*='
+        line: "data_directory = '{{ data_directory }}'"
+      tags: now
+    - name: Start and enable postgresql-server
+      systemd:
+        state: restarted
+        enabled: yes
+        name: postgresql
